@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   DEFAULT_SETTINGS,
+  DEFAULT_TURNS,
   LIMITS,
-  TURNS,
   computeTurns,
   type CardEntry,
   type DeckSettings,
@@ -10,8 +10,11 @@ import {
 
 const STORAGE_KEY = 'tcgtools:deckodds:v1'
 
-/** ฟิลด์ตั้งค่าที่เป็นตัวเลขเดี่ยว (ไม่รวม toggle กับ array) */
-export type NumericSetting = Exclude<keyof DeckSettings, 'skipFirstDraw' | 'extraDraws'>
+/** ฟิลด์ตั้งค่าที่เป็นตัวเลขเดี่ยว (ไม่รวม toggle, array และ turnCount ที่มีปุ่มของตัวเอง) */
+export type NumericSetting = Exclude<
+  keyof DeckSettings,
+  'skipFirstDraw' | 'extraDraws' | 'turnCount'
+>
 
 interface DeckOddsState {
   settings: DeckSettings
@@ -22,14 +25,21 @@ function newId(): string {
   return `card-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
 }
 
-function blankCard(): CardEntry {
+function blankCard(turnCount = DEFAULT_TURNS): CardEntry {
   return {
     id: newId(),
     name: '',
     copies: 4,
     cost: 1,
-    need: Array.from({ length: TURNS }, () => 0),
+    need: Array.from({ length: turnCount }, () => 0),
   }
+}
+
+/** เขียนค่าลง index ที่ระบุ พร้อมยืดอาร์เรย์ด้วย 0 ถ้ายังสั้นไม่ถึง */
+function withValueAt(list: number[], index: number, value: number): number[] {
+  const next = Array.from({ length: Math.max(list.length, index + 1) }, (_, i) => list[i] ?? 0)
+  next[index] = value
+  return next
 }
 
 function freshState(): DeckOddsState {
@@ -53,12 +63,18 @@ function readNumber(
   return clamp(Math.trunc(value), limit.min, limit.max)
 }
 
+/**
+ * อ่านลิสต์ค่ารายเทิร์น — เก็บความยาวเดิมไว้ (ไม่ตัดตาม turnCount)
+ * เพราะกดลดเทิร์นแล้วกดเพิ่มกลับ ค่าที่พิมพ์ไว้จะได้ยังอยู่
+ */
 function readTurnArray(
   value: unknown,
   limit: { min: number; max: number },
 ): number[] {
-  const source = Array.isArray(value) ? value : []
-  return Array.from({ length: TURNS }, (_, i) => readNumber(source[i], 0, limit))
+  const source: unknown[] = Array.isArray(value) ? value : []
+  return source
+    .slice(0, LIMITS.turnCount.max)
+    .map((entry) => readNumber(entry, 0, limit))
 }
 
 /** โหลดของเก่าจาก localStorage แบบไม่เชื่อข้อมูล คีย์ไหนเพี้ยนใช้ค่าเริ่มต้นแทน */
@@ -72,6 +88,7 @@ function loadState(): DeckOddsState {
     const root = parsed as Record<string, unknown>
     const s = (root.settings ?? {}) as Record<string, unknown>
     const settings: DeckSettings = {
+      turnCount: readNumber(s.turnCount, DEFAULT_SETTINGS.turnCount, LIMITS.turnCount),
       deckSize: readNumber(s.deckSize, DEFAULT_SETTINGS.deckSize, LIMITS.deckSize),
       handSize: readNumber(s.handSize, DEFAULT_SETTINGS.handSize, LIMITS.handSize),
       drawPerTurn: readNumber(
@@ -109,7 +126,10 @@ function loadState(): DeckOddsState {
       }
     })
 
-    return { settings, cards: cards.length > 0 ? cards : [blankCard()] }
+    return {
+      settings,
+      cards: cards.length > 0 ? cards : [blankCard(settings.turnCount)],
+    }
   } catch {
     return freshState()
   }
@@ -138,11 +158,34 @@ export function useDeckOdds() {
   }, [])
 
   const setExtraDraw = useCallback((turnIndex: number, value: number) => {
-    setState((prev) => {
-      const extraDraws = [...prev.settings.extraDraws]
-      extraDraws[turnIndex] = value
-      return { ...prev, settings: { ...prev.settings, extraDraws } }
-    })
+    setState((prev) => ({
+      ...prev,
+      settings: {
+        ...prev.settings,
+        extraDraws: withValueAt(prev.settings.extraDraws, turnIndex, value),
+      },
+    }))
+  }, [])
+
+  /** เพิ่ม/ลดจำนวนเทิร์นที่คำนวณ — ค่าที่พิมพ์ไว้ของเทิร์นที่ถูกลดยังเก็บไว้ กดเพิ่มกลับแล้วได้คืน */
+  const addTurn = useCallback(() => {
+    setState((prev) => ({
+      ...prev,
+      settings: {
+        ...prev.settings,
+        turnCount: Math.min(LIMITS.turnCount.max, prev.settings.turnCount + 1),
+      },
+    }))
+  }, [])
+
+  const removeTurn = useCallback(() => {
+    setState((prev) => ({
+      ...prev,
+      settings: {
+        ...prev.settings,
+        turnCount: Math.max(LIMITS.turnCount.min, prev.settings.turnCount - 1),
+      },
+    }))
   }, [])
 
   const updateCard = useCallback((id: string, patch: Partial<CardEntry>) => {
@@ -155,23 +198,26 @@ export function useDeckOdds() {
   const setNeed = useCallback((id: string, turnIndex: number, value: number) => {
     setState((prev) => ({
       ...prev,
-      cards: prev.cards.map((card) => {
-        if (card.id !== id) return card
-        const need = [...card.need]
-        need[turnIndex] = value
-        return { ...card, need }
-      }),
+      cards: prev.cards.map((card) =>
+        card.id === id ? { ...card, need: withValueAt(card.need, turnIndex, value) } : card,
+      ),
     }))
   }, [])
 
   const addCard = useCallback(() => {
-    setState((prev) => ({ ...prev, cards: [...prev.cards, blankCard()] }))
+    setState((prev) => ({
+      ...prev,
+      cards: [...prev.cards, blankCard(prev.settings.turnCount)],
+    }))
   }, [])
 
   const removeCard = useCallback((id: string) => {
     setState((prev) => {
       const cards = prev.cards.filter((card) => card.id !== id)
-      return { ...prev, cards: cards.length > 0 ? cards : [blankCard()] }
+      return {
+        ...prev,
+        cards: cards.length > 0 ? cards : [blankCard(prev.settings.turnCount)],
+      }
     })
   }, [])
 
@@ -192,6 +238,8 @@ export function useDeckOdds() {
     setSetting,
     setSkipFirstDraw,
     setExtraDraw,
+    addTurn,
+    removeTurn,
     updateCard,
     setNeed,
     addCard,

@@ -1,7 +1,7 @@
 import { pAtLeast, pAtLeastOneOf, pJoint } from './hypergeom'
 
-/** ตารางนี้คำนวณให้กี่เทิร์น */
-export const TURNS = 5
+/** จำนวนเทิร์นตอนเริ่ม — กดเพิ่ม/ลดทีหลังได้ที่ settings.turnCount */
+export const DEFAULT_TURNS = 5
 
 /** การ์ด 1 ชนิดในลิสต์ที่อยากได้ */
 export interface CardEntry {
@@ -11,11 +11,16 @@ export interface CardEntry {
   copies: number
   /** พลังงานที่ต้องจ่ายตอนเล่น = คอสต์ของการ์ด */
   cost: number
-  /** อยากมีในมือกี่ใบ ณ เทิร์นนั้น — index 0 = เทิร์น 1 */
+  /**
+   * อยากมีในมือกี่ใบ ณ เทิร์นนั้น — index 0 = เทิร์น 1
+   * อาจสั้นหรือยาวกว่า turnCount ได้ (ลดเทิร์นแล้วค่าเดิมยังอยู่ เผื่อกดเพิ่มกลับ) — ช่องที่ขาดคิดเป็น 0
+   */
   need: number[]
 }
 
 export interface DeckSettings {
+  /** คำนวณถึงเทิร์นที่เท่าไหร่ */
+  turnCount: number
   deckSize: number
   /** การ์ดในมือตอนเริ่มเกม */
   handSize: number
@@ -25,12 +30,13 @@ export interface DeckSettings {
   startEnergy: number
   energyPerTurn: number
   maxEnergy: number
-  /** จั่วเพิ่มจากเอฟเฟกต์การ์ด แยกตามเทิร์น — index 0 = เทิร์น 1 */
+  /** จั่วเพิ่มจากเอฟเฟกต์การ์ด แยกตามเทิร์น — index 0 = เทิร์น 1 ช่องที่ขาดคิดเป็น 0 */
   extraDraws: number[]
 }
 
 /** ค่าตั้งต้นอิงกติกาพื้นฐาน One Piece TCG (เด็ค 50, มือ 5, DON!! +2 สูงสุด 10) */
 export const DEFAULT_SETTINGS: DeckSettings = {
+  turnCount: DEFAULT_TURNS,
   deckSize: 50,
   handSize: 5,
   drawPerTurn: 1,
@@ -38,11 +44,12 @@ export const DEFAULT_SETTINGS: DeckSettings = {
   startEnergy: 0,
   energyPerTurn: 2,
   maxEnergy: 10,
-  extraDraws: Array.from({ length: TURNS }, () => 0),
+  extraDraws: Array.from({ length: DEFAULT_TURNS }, () => 0),
 }
 
 /** ขอบเขตค่าที่รับได้ — ใช้ร่วมกันทั้งตอนโหลดจาก localStorage และตอนกรอกในฟอร์ม */
 export const LIMITS = {
+  turnCount: { min: 1, max: 20 },
   deckSize: { min: 1, max: 200 },
   handSize: { min: 0, max: 30 },
   drawPerTurn: { min: 0, max: 20 },
@@ -102,7 +109,7 @@ export function computeTurns(
   const results: TurnResult[] = []
   let seen = settings.handSize
 
-  for (let turn = 1; turn <= TURNS; turn++) {
+  for (let turn = 1; turn <= settings.turnCount; turn++) {
     const regular = turn === 1 && settings.skipFirstDraw ? 0 : settings.drawPerTurn
     const extra = settings.extraDraws[turn - 1] ?? 0
     const drawnThisTurn = regular + extra

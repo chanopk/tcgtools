@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import NumberField from '../components/NumberField'
 import { useDeckOdds } from '../hooks/useDeckOdds'
-import { LIMITS, TURNS, type CardEntry, type TurnResult } from '../lib/deckOdds'
+import { LIMITS, type CardEntry, type TurnResult } from '../lib/deckOdds'
 
 export default function DeckOddsPage() {
   const deck = useDeckOdds()
@@ -127,6 +127,7 @@ export default function DeckOddsPage() {
                 key={card.id}
                 card={card}
                 index={index}
+                turnCount={settings.turnCount}
                 onPatch={(patch) => deck.updateCard(card.id, patch)}
                 onNeed={(turnIndex, value) => deck.setNeed(card.id, turnIndex, value)}
                 onRemove={() => deck.removeCard(card.id)}
@@ -154,6 +155,27 @@ export default function DeckOddsPage() {
                 onExtraDraw={(value) => deck.setExtraDraw(result.turn - 1, value)}
               />
             ))}
+          </div>
+
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={deck.removeTurn}
+              disabled={settings.turnCount <= LIMITS.turnCount.min}
+              className="h-11 flex-1 rounded-xl border border-zinc-800 bg-zinc-900 text-sm font-bold text-zinc-400 transition-colors active:bg-zinc-800 disabled:opacity-30"
+            >
+              − ลบเทิร์น {settings.turnCount}
+            </button>
+            <button
+              type="button"
+              onClick={deck.addTurn}
+              disabled={settings.turnCount >= LIMITS.turnCount.max}
+              className="h-11 flex-1 rounded-xl border border-dashed border-zinc-700 bg-zinc-900 text-sm font-bold text-zinc-200 transition-colors active:bg-zinc-800 disabled:opacity-30"
+            >
+              {settings.turnCount >= LIMITS.turnCount.max
+                ? `สูงสุด ${LIMITS.turnCount.max} เทิร์น`
+                : `+ เพิ่มเทิร์น ${settings.turnCount + 1}`}
+            </button>
           </div>
 
           <p className="mt-4 text-xs leading-relaxed text-zinc-600">
@@ -189,12 +211,14 @@ function Section({
 function CardRow({
   card,
   index,
+  turnCount,
   onPatch,
   onNeed,
   onRemove,
 }: {
   card: CardEntry
   index: number
+  turnCount: number
   onPatch: (patch: Partial<CardEntry>) => void
   onNeed: (turnIndex: number, value: number) => void
   onRemove: () => void
@@ -244,7 +268,7 @@ function CardRow({
           ต้องการในมือกี่ใบ (แต่ละเทิร์น)
         </span>
         <div className="mt-1 grid grid-cols-5 gap-2">
-          {Array.from({ length: TURNS }, (_, turnIndex) => (
+          {Array.from({ length: turnCount }, (_, turnIndex) => (
             <NumberField
               key={turnIndex}
               label={`T${turnIndex + 1}`}
