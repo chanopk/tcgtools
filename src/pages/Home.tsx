@@ -18,6 +18,8 @@ export default function Home() {
           </p>
         </header>
 
+        <h2 className="mb-3 text-sm font-bold tracking-wide text-zinc-500">ตัวนับคะแนน</h2>
+
         <ul className="flex flex-col gap-3">
           {GAMES.map((game) => {
             const body = (
@@ -62,7 +64,32 @@ export default function Home() {
           })}
         </ul>
 
-        <p className="mt-6 text-center text-sm text-zinc-600">เกมอื่นเร็ว ๆ นี้</p>
+        <p className="mt-3 text-center text-sm text-zinc-600">เกมอื่นเร็ว ๆ นี้</p>
+
+        <h2 className="mt-8 mb-3 text-sm font-bold tracking-wide text-zinc-500">
+          เครื่องมือช่วยจัดเด็ค
+        </h2>
+
+        <Link
+          to="/tools/deck-odds"
+          className="flex items-center gap-4 rounded-2xl border border-zinc-800 bg-zinc-900 p-4 transition-colors active:bg-zinc-800"
+        >
+          <span aria-hidden className="text-4xl leading-none">
+            🎲
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-xl font-bold text-zinc-50">โอกาสจั่วเจอการ์ด</span>
+            <span className="block text-sm text-zinc-400">
+              % ที่จะมีการ์ดที่เล่นได้ในแต่ละเทิร์น
+            </span>
+            <span className="mt-1 block text-xs text-zinc-500">
+              อ้างอิงกติกาพื้นฐาน One Piece TCG
+            </span>
+          </span>
+          <span aria-hidden className="text-2xl text-zinc-600">
+            ›
+          </span>
+        </Link>
       </div>
     </div>
   )
