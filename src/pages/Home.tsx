@@ -80,10 +80,10 @@ export default function Home() {
           <span className="min-w-0 flex-1">
             <span className="block text-xl font-bold text-zinc-50">โอกาสจั่วเจอการ์ด</span>
             <span className="block text-sm text-zinc-400">
-              % ที่จะมีการ์ดที่เล่นได้ในแต่ละเทิร์น
+              % ที่จะจั่วติดการ์ดที่อยากเล่นในแต่ละเทิร์น
             </span>
             <span className="mt-1 block text-xs text-zinc-500">
-              อ้างอิงกติกาพื้นฐาน One Piece TCG
+              One Piece TCG · เทียบเริ่มก่อน/เริ่มหลังในจอเดียว
             </span>
           </span>
           <span aria-hidden className="text-2xl text-zinc-600">

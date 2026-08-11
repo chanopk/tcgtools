@@ -9,6 +9,8 @@ interface Props {
   label?: string
   /** ใส่เมื่อ label สั้นเกินจนคนใช้ screen reader ไม่เข้าใจ */
   ariaLabel?: string
+  /** true = ช่องเตี้ยลงสำหรับใส่ในตารางที่มีหลายช่องต่อแถว */
+  compact?: boolean
   className?: string
 }
 
@@ -27,6 +29,7 @@ export default function NumberField({
   onChange,
   label,
   ariaLabel,
+  compact = false,
   className = '',
 }: Props) {
   const [draft, setDraft] = useState('')
@@ -59,7 +62,9 @@ export default function NumberField({
             onChange(clamp(Math.trunc(parsed), min, max))
           }
         }}
-        className="h-11 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-2 text-center text-base font-bold tabular-nums text-zinc-50 outline-none focus:border-zinc-500"
+        className={`w-full border border-zinc-800 bg-zinc-950 text-center font-bold tabular-nums text-zinc-50 outline-none focus:border-zinc-500 ${
+          compact ? 'h-8 rounded-lg px-0.5 text-sm' : 'h-11 rounded-xl px-2 text-base'
+        }`}
       />
     </label>
   )

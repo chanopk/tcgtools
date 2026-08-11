@@ -2,190 +2,236 @@ import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import NumberField from '../components/NumberField'
 import { useDeckOdds } from '../hooks/useDeckOdds'
-import { LIMITS, type CardEntry, type TurnResult } from '../lib/deckOdds'
+import {
+  LIMITS,
+  SIDES,
+  type Board,
+  type CardEntry,
+  type DeckSettings,
+  type Side,
+  type TurnResult,
+} from '../lib/deckOdds'
+
+/**
+ * สีและคำเรียกของสองฝั่ง — ใช้ชุดเดียวกันทั้งช่องกรอกและตารางผล
+ * จะได้กวาดตาจากที่กรอกไปหาผลได้โดยไม่ต้องอ่านหัวตารางซ้ำ
+ */
+const SIDE_META: Record<Side, { label: string; dot: string; text: string }> = {
+  first: { label: 'เริ่มก่อน', dot: 'bg-amber-400', text: 'text-amber-300' },
+  second: { label: 'เริ่มหลัง', dot: 'bg-sky-400', text: 'text-sky-300' },
+}
 
 export default function DeckOddsPage() {
   const deck = useDeckOdds()
-  const { settings, cards, results, totalCopies } = deck
+  const { settings, cards, board, totalCopies } = deck
   const overfilled = totalCopies > settings.deckSize
+  const turns = Array.from({ length: settings.turnCount }, (_, i) => i + 1)
 
   return (
     <div
-      className="min-h-[100dvh] bg-zinc-950 px-4"
+      className="min-h-[100dvh] bg-zinc-950 px-3"
       style={{
-        paddingTop: 'calc(env(safe-area-inset-top) + 1.5rem)',
-        paddingBottom: 'calc(env(safe-area-inset-bottom) + 2.5rem)',
+        paddingTop: 'calc(env(safe-area-inset-top) + 1rem)',
+        paddingBottom: 'calc(env(safe-area-inset-bottom) + 2rem)',
       }}
     >
-      <div className="mx-auto w-full max-w-3xl">
-        <header className="mb-6">
+      <div className="mx-auto w-full max-w-4xl">
+        <header className="mb-3">
           <Link
             to="/"
-            className="-ml-2 inline-block rounded-lg px-2 py-1 text-sm font-semibold text-zinc-400 active:bg-zinc-800"
+            className="-ml-1 inline-block rounded-lg px-1.5 py-0.5 text-xs font-semibold text-zinc-500 active:bg-zinc-800"
           >
             ‹ กลับ
           </Link>
-          <h1 className="mt-2 text-3xl font-black tracking-tight text-zinc-50">
-            โอกาสจั่วเจอการ์ด
+          <h1 className="mt-1 text-2xl font-black tracking-tight text-zinc-50">
+            One Piece TCG · โอกาสจั่วเจอการ์ด
           </h1>
-          <p className="mt-1 text-sm text-zinc-400">
-            คำนวณ % ที่จะมีการ์ดที่เล่นได้ในแต่ละเทิร์น · อ้างอิงกติกาพื้นฐาน One Piece TCG
+          <p className="mt-1 text-[0.7rem] leading-relaxed text-zinc-500">
+            {assumptionLine(settings)}
           </p>
         </header>
 
-        <Section
-          title="เด็คและการจั่ว"
-          action={
-            <button
-              type="button"
-              onClick={deck.resetAll}
-              className="rounded-lg px-2 py-1 text-xs font-semibold text-zinc-500 active:bg-zinc-800"
-            >
-              ⟳ คืนค่าเริ่มต้น
-            </button>
-          }
-        >
-          <div className="grid grid-cols-3 gap-2">
-            <NumberField
-              label="ขนาดเด็ค"
-              value={settings.deckSize}
-              {...LIMITS.deckSize}
-              onChange={(v) => deck.setSetting('deckSize', v)}
-            />
-            <NumberField
-              label="มือเริ่มต้น"
-              value={settings.handSize}
-              {...LIMITS.handSize}
-              onChange={(v) => deck.setSetting('handSize', v)}
-            />
-            <NumberField
-              label="จั่ว/เทิร์น"
-              value={settings.drawPerTurn}
-              {...LIMITS.drawPerTurn}
-              onChange={(v) => deck.setSetting('drawPerTurn', v)}
-            />
+        <details className="mb-3 rounded-xl border border-zinc-800 bg-zinc-900/50">
+          <summary className="cursor-pointer px-3 py-2 text-xs font-bold text-zinc-400 marker:content-none">
+            ⚙ ปรับกติกา / ขนาดเด็ค
+          </summary>
+          <div className="border-t border-zinc-800 p-3">
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+              <NumberField
+                label="ขนาดเด็ค"
+                value={settings.deckSize}
+                {...LIMITS.deckSize}
+                onChange={(v) => deck.setSetting('deckSize', v)}
+              />
+              <NumberField
+                label="มือเริ่มต้น"
+                value={settings.handSize}
+                {...LIMITS.handSize}
+                onChange={(v) => deck.setSetting('handSize', v)}
+              />
+              <NumberField
+                label="จั่ว/เทิร์น"
+                value={settings.drawPerTurn}
+                {...LIMITS.drawPerTurn}
+                onChange={(v) => deck.setSetting('drawPerTurn', v)}
+              />
+              <NumberField
+                label="DON!!/เทิร์น"
+                ariaLabel="DON!! ที่ได้ต่อเทิร์น"
+                value={settings.donPerTurn}
+                {...LIMITS.donPerTurn}
+                onChange={(v) => deck.setSetting('donPerTurn', v)}
+              />
+              <NumberField
+                label="DON!! สูงสุด"
+                value={settings.maxDon}
+                {...LIMITS.maxDon}
+                onChange={(v) => deck.setSetting('maxDon', v)}
+              />
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-2">
+              <p className="text-[0.65rem] leading-relaxed text-zinc-600">
+                ฝ่ายเริ่มก่อนถูกหักให้อัตโนมัติตามกติกา — เทิร์นแรกไม่จั่ว และวาง DON!! ได้ใบเดียว
+              </p>
+              <button
+                type="button"
+                onClick={deck.resetAll}
+                className="shrink-0 rounded-lg px-2 py-1 text-xs font-semibold text-zinc-500 active:bg-zinc-800"
+              >
+                ⟳ คืนค่าเริ่มต้น
+              </button>
+            </div>
           </div>
-
-          <label className="mt-3 flex items-center gap-3 rounded-xl bg-zinc-950/60 px-3 py-2.5">
-            <input
-              type="checkbox"
-              checked={settings.skipFirstDraw}
-              onChange={(e) => deck.setSkipFirstDraw(e.target.checked)}
-              className="h-5 w-5 shrink-0 accent-emerald-400"
-            />
-            <span className="text-sm text-zinc-300">
-              เล่นก่อน — เทิร์นแรกไม่ได้จั่ว
-              <span className="block text-xs text-zinc-500">
-                ติ๊กเมื่อเป็นฝ่ายเริ่มเกม เทิร์น 1 จะเห็นแค่การ์ดในมือเริ่มต้น
-              </span>
-            </span>
-          </label>
-
-          <h3 className="mt-4 mb-2 text-xs font-bold tracking-wide text-zinc-500">
-            พลังงาน (DON!!)
-          </h3>
-          <div className="grid grid-cols-3 gap-2">
-            <NumberField
-              label="เริ่มต้น"
-              ariaLabel="พลังงานเริ่มต้น"
-              value={settings.startEnergy}
-              {...LIMITS.startEnergy}
-              onChange={(v) => deck.setSetting('startEnergy', v)}
-            />
-            <NumberField
-              label="เพิ่ม/เทิร์น"
-              ariaLabel="พลังงานที่เพิ่มต่อเทิร์น"
-              value={settings.energyPerTurn}
-              {...LIMITS.energyPerTurn}
-              onChange={(v) => deck.setSetting('energyPerTurn', v)}
-            />
-            <NumberField
-              label="สูงสุด"
-              ariaLabel="พลังงานสูงสุด"
-              value={settings.maxEnergy}
-              {...LIMITS.maxEnergy}
-              onChange={(v) => deck.setSetting('maxEnergy', v)}
-            />
-          </div>
-        </Section>
+        </details>
 
         <Section
           title="การ์ดที่อยากได้"
           action={
-            <button
-              type="button"
-              onClick={deck.addCard}
-              className="rounded-lg bg-zinc-800 px-3 py-1.5 text-xs font-bold text-zinc-200 active:bg-zinc-700"
-            >
-              + เพิ่มการ์ด
-            </button>
+            <div className="flex items-center gap-2">
+              <label className="flex cursor-pointer items-center gap-1.5 text-[0.7rem] text-zinc-400">
+                <input
+                  type="checkbox"
+                  checked={settings.linkSides}
+                  onChange={(e) => deck.setLinkSides(e.target.checked)}
+                  className="h-4 w-4 accent-emerald-400"
+                />
+                ล็อกสองฝั่งให้เท่ากัน
+              </label>
+              <button
+                type="button"
+                onClick={deck.addCard}
+                className="rounded-lg bg-zinc-800 px-2.5 py-1 text-xs font-bold text-zinc-200 active:bg-zinc-700"
+              >
+                + การ์ด
+              </button>
+            </div>
           }
         >
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-2">
             {cards.map((card, index) => (
               <CardRow
                 key={card.id}
                 card={card}
                 index={index}
-                turnCount={settings.turnCount}
+                turns={turns}
+                linkSides={settings.linkSides}
                 onPatch={(patch) => deck.updateCard(card.id, patch)}
-                onNeed={(turnIndex, value) => deck.setNeed(card.id, turnIndex, value)}
+                onNeed={(side, turnIndex, value) =>
+                  deck.setNeed(card.id, side, turnIndex, value)
+                }
                 onRemove={() => deck.removeCard(card.id)}
               />
             ))}
           </div>
 
-          <p className="mt-3 text-xs text-zinc-500">
+          <p className="mt-2 text-[0.7rem] text-zinc-500">
             รวมการ์ดที่ระบุ {totalCopies} ใบ จากเด็ค {settings.deckSize} ใบ
+            {settings.linkSides && ' · กำลังล็อกสองฝั่งให้ใช้ค่าเดียวกัน'}
           </p>
           {overfilled && (
-            <p className="mt-1 text-xs font-semibold text-rose-300" role="alert">
+            <p className="mt-1 text-[0.7rem] font-semibold text-rose-300" role="alert">
               ⚠ จำนวนการ์ดรวมเกินขนาดเด็ค — % จะคำนวณไม่ได้จนกว่าจะแก้
             </p>
           )}
         </Section>
 
-        <Section title="ผลลัพธ์แต่ละเทิร์น">
-          <div className="grid gap-3 sm:grid-cols-2">
-            {results.map((result) => (
-              <TurnCard
-                key={result.turn}
-                result={result}
-                extraDraw={settings.extraDraws[result.turn - 1] ?? 0}
-                onExtraDraw={(value) => deck.setExtraDraw(result.turn - 1, value)}
-              />
+        <Section title="จั่วเพิ่มจากเอฟเฟกต์การ์ด">
+          <MatrixTable turns={turns} corner="เทิร์น">
+            {SIDES.map((side) => (
+              <tr key={side}>
+                <SideLabelCell side={side} />
+                {turns.map((turn) => (
+                  <td key={turn} className="px-0.5 py-0.5">
+                    <NumberField
+                      compact
+                      ariaLabel={`จั่วเพิ่ม ${SIDE_META[side].label} เทิร์น ${turn}`}
+                      value={settings.extraDraws[side][turn - 1] ?? 0}
+                      {...LIMITS.extraDraw}
+                      onChange={(v) => deck.setExtraDraw(side, turn - 1, v)}
+                    />
+                  </td>
+                ))}
+              </tr>
             ))}
-          </div>
+          </MatrixTable>
+          <p className="mt-2 text-[0.7rem] text-zinc-600">
+            ใส่จำนวนใบที่การ์ดเอฟเฟกต์จั่วให้ในเทิร์นนั้น — บวกสะสมไปเทิร์นถัด ๆ ไปด้วย
+          </p>
+        </Section>
 
-          <div className="mt-3 flex gap-2">
-            <button
-              type="button"
-              onClick={deck.removeTurn}
-              disabled={settings.turnCount <= LIMITS.turnCount.min}
-              className="h-11 flex-1 rounded-xl border border-zinc-800 bg-zinc-900 text-sm font-bold text-zinc-400 transition-colors active:bg-zinc-800 disabled:opacity-30"
-            >
-              − ลบเทิร์น {settings.turnCount}
-            </button>
-            <button
-              type="button"
-              onClick={deck.addTurn}
-              disabled={settings.turnCount >= LIMITS.turnCount.max}
-              className="h-11 flex-1 rounded-xl border border-dashed border-zinc-700 bg-zinc-900 text-sm font-bold text-zinc-200 transition-colors active:bg-zinc-800 disabled:opacity-30"
-            >
-              {settings.turnCount >= LIMITS.turnCount.max
-                ? `สูงสุด ${LIMITS.turnCount.max} เทิร์น`
-                : `+ เพิ่มเทิร์น ${settings.turnCount + 1}`}
-            </button>
-          </div>
+        <Section
+          title="ผลลัพธ์"
+          action={
+            <div className="flex items-center gap-1">
+              <span className="text-[0.7rem] text-zinc-500">เทิร์น</span>
+              <StepButton
+                label="ลดจำนวนเทิร์น"
+                disabled={settings.turnCount <= LIMITS.turnCount.min}
+                onPress={deck.removeTurn}
+              >
+                −
+              </StepButton>
+              <span className="w-6 text-center text-sm font-bold tabular-nums text-zinc-100">
+                {settings.turnCount}
+              </span>
+              <StepButton
+                label="เพิ่มจำนวนเทิร์น"
+                disabled={settings.turnCount >= LIMITS.turnCount.max}
+                onPress={deck.addTurn}
+              >
+                +
+              </StepButton>
+            </div>
+          }
+        >
+          <ResultTable board={board} cards={cards} turns={turns} />
 
-          <p className="mt-4 text-xs leading-relaxed text-zinc-600">
-            คิดจากสูตร hypergeometric — นับการ์ดที่เห็นแล้วสะสมตั้งแต่มือเริ่มต้นถึงเทิร์นนั้น
-            ยังไม่รวมการมัลลิแกน การเสิร์ชการ์ดแบบเจาะจง และการ์ดที่ทิ้งไปเอง
+          <p className="mt-2 text-[0.65rem] leading-relaxed text-zinc-600">
+            ตัวเลขใหญ่ = โอกาสมีการ์ดใบนั้นครบตามที่ตั้งไว้ —{' '}
+            <span className="text-emerald-300">เขียว ≥ 80%</span> ·{' '}
+            <span className="text-zinc-100">ขาว 50–80%</span> ·{' '}
+            <span className="text-rose-300">แดง &lt; 50%</span> ·{' '}
+            <span className="text-amber-400">เหลือง</span> = จั่วติดแล้วแต่ DON!! ไม่พอจ่ายคอสต์ ·{' '}
+            <span className="text-zinc-500">–</span> ไม่ได้ตั้งเป้า
+            <br />
+            คิดจากการจั่วแบบสุ่มล้วน (hypergeometric) ยังไม่รวมมัลลิแกน การเสิร์ชการ์ดแบบเจาะจง
+            และการ์ดที่ทิ้งไปเอง
           </p>
         </Section>
       </div>
     </div>
   )
+}
+
+/** บรรทัดสรุปกติกาที่ใช้คำนวณ — มีไว้ให้ติดไปในภาพแคปหน้าจอด้วย */
+function assumptionLine(settings: DeckSettings): string {
+  return [
+    `เด็ค ${settings.deckSize} ใบ`,
+    `มือเริ่มต้น ${settings.handSize}`,
+    `จั่ว ${settings.drawPerTurn}/เทิร์น`,
+    `DON!! +${settings.donPerTurn} สูงสุด ${settings.maxDon}`,
+    'เริ่มก่อน: เทิร์นแรกไม่จั่ว + DON!! 1 ใบ',
+  ].join(' · ')
 }
 
 function Section({
@@ -198,9 +244,9 @@ function Section({
   children: ReactNode
 }) {
   return (
-    <section className="mb-5 rounded-2xl border border-zinc-800 bg-zinc-900/50 p-3">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <h2 className="text-sm font-bold tracking-wide text-zinc-300">{title}</h2>
+    <section className="mb-3 rounded-xl border border-zinc-800 bg-zinc-900/50 p-2.5">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-xs font-bold tracking-wide text-zinc-300">{title}</h2>
         {action}
       </div>
       {children}
@@ -208,47 +254,98 @@ function Section({
   )
 }
 
+/** ตารางที่คอลัมน์เป็นเทิร์น — เลื่อนแนวนอนได้เมื่อเทิร์นเยอะ ส่วนคอลัมน์ชื่อปักอยู่กับที่ */
+function MatrixTable({
+  turns,
+  corner,
+  children,
+}: {
+  turns: number[]
+  corner: string
+  children: ReactNode
+}) {
+  return (
+    <div className="-mx-1 overflow-x-auto px-1">
+      <table className="w-full border-collapse">
+        <thead>
+          <tr>
+            <th className="sticky left-0 z-10 bg-zinc-950 pr-2 text-left text-[0.6rem] font-bold text-zinc-600">
+              {corner}
+            </th>
+            {turns.map((turn) => (
+              <th
+                key={turn}
+                className="min-w-[2.6rem] px-0.5 pb-1 text-center text-[0.6rem] font-bold text-zinc-500"
+              >
+                T{turn}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>{children}</tbody>
+      </table>
+    </div>
+  )
+}
+
+function SideLabelCell({ side, sub }: { side: Side; sub?: string }) {
+  const meta = SIDE_META[side]
+  return (
+    <th className="sticky left-0 z-10 bg-zinc-950 py-0.5 pr-2 text-left align-middle">
+      <span className="flex items-center gap-1.5 whitespace-nowrap">
+        <span aria-hidden className={`h-2 w-2 shrink-0 rounded-full ${meta.dot}`} />
+        <span className={`text-[0.7rem] font-bold ${meta.text}`}>{meta.label}</span>
+      </span>
+      {sub && <span className="block text-[0.6rem] text-zinc-600">{sub}</span>}
+    </th>
+  )
+}
+
 function CardRow({
   card,
   index,
-  turnCount,
+  turns,
+  linkSides,
   onPatch,
   onNeed,
   onRemove,
 }: {
   card: CardEntry
   index: number
-  turnCount: number
+  turns: number[]
+  linkSides: boolean
   onPatch: (patch: Partial<CardEntry>) => void
-  onNeed: (turnIndex: number, value: number) => void
+  onNeed: (side: Side, turnIndex: number, value: number) => void
   onRemove: () => void
 }) {
+  const sides: Side[] = linkSides ? ['first'] : SIDES
+
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-950/60 p-3">
-      <div className="flex items-end gap-2">
-        <label className="flex min-w-0 flex-1 flex-col gap-1">
-          <span className="text-[0.65rem] font-semibold text-zinc-500">ชื่อการ์ด</span>
-          <input
-            type="text"
-            value={card.name}
-            placeholder={`การ์ด ${index + 1}`}
-            maxLength={40}
-            onChange={(e) => onPatch({ name: e.target.value })}
-            className="h-11 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 text-sm font-semibold text-zinc-50 outline-none placeholder:text-zinc-600 focus:border-zinc-500"
-          />
-        </label>
+    <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-2">
+      <div className="flex items-center gap-1.5">
+        <input
+          type="text"
+          value={card.name}
+          placeholder={`การ์ด ${index + 1}`}
+          maxLength={40}
+          aria-label={`ชื่อการ์ด ${index + 1}`}
+          onChange={(e) => onPatch({ name: e.target.value })}
+          className="h-8 min-w-0 flex-1 rounded-lg border border-zinc-800 bg-zinc-950 px-2 text-sm font-semibold text-zinc-50 outline-none placeholder:text-zinc-600 focus:border-zinc-500"
+        />
+        <span className="text-[0.65rem] font-semibold text-zinc-500">ในเด็ค</span>
         <NumberField
-          label="ในเด็ค"
+          compact
+          className="w-11"
           ariaLabel={`จำนวนใบในเด็คของการ์ด ${index + 1}`}
-          className="w-16"
           value={card.copies}
           {...LIMITS.copies}
           onChange={(v) => onPatch({ copies: v })}
         />
+        <span className="text-[0.65rem] font-semibold text-zinc-500">คอสต์</span>
         <NumberField
-          label="คอสต์"
+          compact
+          className="w-11"
           ariaLabel={`คอสต์ของการ์ด ${index + 1}`}
-          className="w-16"
           value={card.cost}
           {...LIMITS.cost}
           onChange={(v) => onPatch({ cost: v })}
@@ -257,139 +354,205 @@ function CardRow({
           type="button"
           onClick={onRemove}
           aria-label={`ลบการ์ด ${index + 1}`}
-          className="h-11 w-11 shrink-0 rounded-xl bg-zinc-800 text-lg leading-none font-bold text-zinc-500 active:bg-zinc-700"
+          className="h-8 w-8 shrink-0 rounded-lg bg-zinc-900 text-sm font-bold text-zinc-500 active:bg-zinc-800"
         >
           ✕
         </button>
       </div>
 
-      <div className="mt-3">
-        <span className="text-[0.65rem] font-semibold text-zinc-500">
-          ต้องการในมือกี่ใบ (แต่ละเทิร์น)
-        </span>
-        <div className="mt-1 grid grid-cols-5 gap-2">
-          {Array.from({ length: turnCount }, (_, turnIndex) => (
-            <NumberField
-              key={turnIndex}
-              label={`T${turnIndex + 1}`}
-              ariaLabel={`การ์ด ${index + 1} ต้องการในมือ เทิร์น ${turnIndex + 1}`}
-              value={card.need[turnIndex] ?? 0}
-              {...LIMITS.need}
-              onChange={(v) => onNeed(turnIndex, v)}
-            />
+      <div className="mt-1.5">
+        <MatrixTable turns={turns} corner="ต้องการในมือ">
+          {sides.map((side) => (
+            <tr key={side}>
+              <SideLabelCell side={side} sub={linkSides ? 'ใช้ทั้งสองฝั่ง' : undefined} />
+              {turns.map((turn) => (
+                <td key={turn} className="px-0.5 py-0.5">
+                  <NumberField
+                    compact
+                    ariaLabel={`การ์ด ${index + 1} ${SIDE_META[side].label} ต้องการในมือ เทิร์น ${turn}`}
+                    value={card.need[side][turn - 1] ?? 0}
+                    {...LIMITS.need}
+                    onChange={(v) => onNeed(side, turn - 1, v)}
+                  />
+                </td>
+              ))}
+            </tr>
           ))}
-        </div>
+        </MatrixTable>
       </div>
     </div>
   )
 }
 
-function TurnCard({
-  result,
-  extraDraw,
-  onExtraDraw,
+function ResultTable({
+  board,
+  cards,
+  turns,
 }: {
-  result: TurnResult
-  extraDraw: number
-  onExtraDraw: (value: number) => void
+  board: Board
+  cards: CardEntry[]
+  turns: number[]
 }) {
-  const tone = toneFor(result.anyPlayable)
+  return (
+    <div className="-mx-1 overflow-x-auto px-1">
+      <table className="w-full border-collapse">
+        <thead>
+          <tr>
+            <th className="sticky left-0 z-10 bg-zinc-950" />
+            {turns.map((turn) => (
+              <th
+                key={turn}
+                className="min-w-[3rem] px-1 pb-1 text-center text-[0.65rem] font-bold text-zinc-400"
+              >
+                T{turn}
+              </th>
+            ))}
+          </tr>
+        </thead>
+
+        {SIDES.map((side) => (
+          <SideBlock
+            key={side}
+            side={side}
+            results={board[side]}
+            cards={cards}
+            turns={turns}
+          />
+        ))}
+      </table>
+    </div>
+  )
+}
+
+function SideBlock({
+  side,
+  results,
+  cards,
+  turns,
+}: {
+  side: Side
+  results: TurnResult[]
+  cards: CardEntry[]
+  turns: number[]
+}) {
+  const meta = SIDE_META[side]
+  const showAllRow = results.some((r) => r.targetCount >= 2)
 
   return (
-    <div className="flex flex-col rounded-2xl border border-zinc-800 bg-zinc-950/60 p-3">
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="text-sm font-bold text-zinc-100">เทิร์น {result.turn}</span>
-        <span className="text-[0.7rem] text-zinc-500">
-          เห็นแล้ว {result.cardsSeen} ใบ · ⚡ {result.energy}
-          {result.deckOut && <span className="text-amber-400"> · จั่วหมดเด็ค</span>}
-        </span>
-      </div>
+    <tbody className="border-t border-zinc-800">
+      <tr>
+        <th
+          colSpan={turns.length + 1}
+          className="sticky left-0 py-1 text-left text-[0.7rem] font-bold"
+        >
+          <span className="flex items-center gap-1.5">
+            <span aria-hidden className={`h-2 w-2 rounded-full ${meta.dot}`} />
+            <span className={meta.text}>{meta.label}</span>
+          </span>
+        </th>
+      </tr>
 
-      {result.anyPlayable === null ? (
-        <p className="mt-3 flex-1 text-xs text-zinc-500">
-          ยังไม่ได้ตั้ง “ต้องการในมือ” ของเทิร์นนี้ — ใส่ตัวเลขในช่อง T{result.turn}{' '}
-          ด้านบนเพื่อดู %
-        </p>
-      ) : (
-        <>
-          <div className="mt-2 flex items-end gap-2">
-            <span className={`text-4xl leading-none font-black tabular-nums ${tone.text}`}>
-              {formatPercent(result.anyPlayable)}
+      <StatRow
+        label="เห็นการ์ด"
+        values={results.map((r) => (
+          <span className={r.deckOut ? 'text-amber-400' : 'text-zinc-400'}>
+            {r.cardsSeen}
+          </span>
+        ))}
+      />
+      <StatRow
+        label="DON!!"
+        values={results.map((r) => <span className="text-zinc-400">{r.don}</span>)}
+      />
+
+      {cards.map((card, index) => (
+        <tr key={card.id} className="border-t border-zinc-900">
+          <th className="sticky left-0 z-10 max-w-[8rem] bg-zinc-950 py-1 pr-2 text-left">
+            <span className="block truncate text-[0.7rem] font-semibold text-zinc-300">
+              {card.name || `การ์ด ${index + 1}`}
             </span>
-            <span className="pb-0.5 text-[0.7rem] leading-tight text-zinc-400">
-              โอกาสมีการ์ด
-              <br />
-              ที่เล่นได้ ≥ 1 ใบ
+            <span className="block text-[0.6rem] text-zinc-600">
+              ×{card.copies} · คอสต์ {card.cost}
             </span>
-          </div>
-
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-zinc-800">
-            <div
-              className={`h-full rounded-full ${tone.bar}`}
-              style={{ width: `${result.anyPlayable * 100}%` }}
-            />
-          </div>
-
-          {result.targets.length > 1 && result.allTargets !== null && (
-            <p className="mt-2 text-[0.7rem] text-zinc-400">
-              ได้ครบทุกใบที่ตั้งไว้{' '}
-              <span className="font-bold text-zinc-200">
-                {formatPercent(result.allTargets)}
-              </span>
-            </p>
-          )}
-
-          <ul className="mt-2 flex flex-col gap-1 border-t border-zinc-800 pt-2">
-            {result.targets.map((target, index) => (
-              <li key={target.id} className="flex items-center gap-2 text-[0.7rem]">
-                <span className="min-w-0 flex-1 truncate text-zinc-300">
-                  {target.name || `การ์ด ${index + 1}`}
-                  <span className="text-zinc-600">
-                    {' '}
-                    ×{target.copies} · คอสต์ {target.cost}
-                  </span>
-                </span>
-                {!target.affordable && (
-                  <span className="shrink-0 rounded bg-amber-400/15 px-1 font-semibold text-amber-300">
-                    ⚡ ไม่พอ
+          </th>
+          {results.map((result) => {
+            const cell = result.cells[index]
+            return (
+              <td key={result.turn} className="px-1 py-1 text-center">
+                {cell.chance === null ? (
+                  <span className="text-[0.75rem] text-zinc-700">–</span>
+                ) : (
+                  <span
+                    className={`text-[0.95rem] leading-none font-black tabular-nums ${
+                      cell.affordable ? toneFor(cell.chance) : 'text-amber-400'
+                    }`}
+                    title={
+                      cell.affordable
+                        ? undefined
+                        : `DON!! เทิร์นนี้ ${result.don} ไม่พอจ่ายคอสต์ ${card.cost}`
+                    }
+                  >
+                    {formatPercent(cell.chance)}
                   </span>
                 )}
-                <span className="shrink-0 text-zinc-500">ขอ {target.need}</span>
-                <span className="w-12 shrink-0 text-right font-bold tabular-nums text-zinc-100">
-                  {formatPercent(target.chance)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </>
+              </td>
+            )
+          })}
+        </tr>
+      ))}
+
+      {showAllRow && (
+        <tr className="border-t border-zinc-800">
+          <th className="sticky left-0 z-10 bg-zinc-950 py-1 pr-2 text-left text-[0.7rem] font-semibold text-zinc-400">
+            ครบทุกใบที่ตั้ง
+          </th>
+          {results.map((result) => (
+            <td
+              key={result.turn}
+              className="px-1 py-1 text-center text-[0.7rem] font-semibold tabular-nums text-zinc-300"
+            >
+              {result.allTargets === null || result.targetCount < 2 ? (
+                <span className="text-zinc-700">–</span>
+              ) : (
+                formatPercent(result.allTargets)
+              )}
+            </td>
+          ))}
+        </tr>
       )}
 
-      <div className="mt-3 flex items-center justify-between gap-2 rounded-xl bg-zinc-900 px-2 py-1.5">
-        <span className="text-[0.7rem] text-zinc-400">
-          จั่วเพิ่มเทิร์นนี้
-          <span className="block text-[0.6rem] text-zinc-600">จากเอฟเฟกต์การ์ด</span>
-        </span>
-        <div className="flex shrink-0 items-center gap-1">
-          <StepButton
-            label={`ลดจั่วเพิ่มเทิร์น ${result.turn}`}
-            disabled={extraDraw <= LIMITS.extraDraw.min}
-            onPress={() => onExtraDraw(extraDraw - 1)}
+      <tr>
+        <th className="sticky left-0 z-10 bg-zinc-950 py-0.5 pr-2 text-left text-[0.6rem] font-normal text-zinc-600">
+          เล่นได้ ≥ 1 ใบ
+        </th>
+        {results.map((result) => (
+          <td
+            key={result.turn}
+            className="px-1 py-0.5 text-center text-[0.6rem] tabular-nums text-zinc-600"
           >
-            −
-          </StepButton>
-          <span className="w-7 text-center text-lg leading-none font-bold tabular-nums text-zinc-100">
-            {extraDraw}
-          </span>
-          <StepButton
-            label={`เพิ่มจั่วเพิ่มเทิร์น ${result.turn}`}
-            disabled={extraDraw >= LIMITS.extraDraw.max}
-            onPress={() => onExtraDraw(extraDraw + 1)}
-          >
-            +
-          </StepButton>
-        </div>
-      </div>
-    </div>
+            {result.anyPlayable === null ? '–' : formatPercent(result.anyPlayable)}
+          </td>
+        ))}
+      </tr>
+    </tbody>
+  )
+}
+
+function StatRow({ label, values }: { label: string; values: ReactNode[] }) {
+  return (
+    <tr>
+      <th className="sticky left-0 z-10 bg-zinc-950 py-0.5 pr-2 text-left text-[0.65rem] font-semibold text-zinc-500">
+        {label}
+      </th>
+      {values.map((value, index) => (
+        <td
+          key={index}
+          className="px-1 py-0.5 text-center text-[0.7rem] font-semibold tabular-nums"
+        >
+          {value}
+        </td>
+      ))}
+    </tr>
   )
 }
 
@@ -410,7 +573,7 @@ function StepButton({
       aria-label={label}
       disabled={disabled}
       onClick={onPress}
-      className="h-9 w-9 shrink-0 rounded-lg bg-zinc-800 text-xl leading-none font-black text-zinc-200 transition-colors active:bg-zinc-700 disabled:opacity-30"
+      className="h-7 w-7 shrink-0 rounded-lg bg-zinc-800 text-base leading-none font-black text-zinc-200 transition-colors active:bg-zinc-700 disabled:opacity-30"
     >
       {children}
     </button>
@@ -422,9 +585,8 @@ function formatPercent(value: number) {
 }
 
 /** สีตาม % เพื่อให้กวาดตาหาเทิร์นที่ยังไม่ผ่านเกณฑ์ได้เร็ว */
-function toneFor(probability: number | null) {
-  if (probability === null) return { text: 'text-zinc-500', bar: 'bg-zinc-700' }
-  if (probability >= 0.8) return { text: 'text-emerald-300', bar: 'bg-emerald-400' }
-  if (probability >= 0.5) return { text: 'text-amber-300', bar: 'bg-amber-400' }
-  return { text: 'text-rose-300', bar: 'bg-rose-400' }
+function toneFor(probability: number) {
+  if (probability >= 0.8) return 'text-emerald-300'
+  if (probability >= 0.5) return 'text-zinc-100'
+  return 'text-rose-300'
 }
